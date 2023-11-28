@@ -1,0 +1,106 @@
+---
+title: "crack size"
+author: "Edna Paola Gutierrez Vega"
+date: '2023-11-27'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introducción
+
+La siguiente tabla presenta el tamaño de las grietas por fatiga en relación con el número de ciclos de tensión aplicada para 21 probetas, proporcionando un ejemplo de datos de degradación. Estos datos fueron inicialmente reportados por Hudak, Saxena, Bucci y Malcolm (1978) con el propósito de recopilar información sobre las tasas de crecimiento de grietas en la aleación.
+
+Cabe destacar que el tamaño inicial de cada grieta (es decir, en el momento 0) para cada trayectoria fue de 0.9 pulgadas. Supongamos que los investigadores desearan estimar el tiempo (medido en número de ciclos) en el cual las grietas alcanzarían las 1.6 pulgadas, considerado un tamaño peligroso. Con fines de nuestro análisis de degradación, se decidió terminar el experimento de fatiga para cada especimen en la primera inspección posterior a la cual las grietas alcanzaron las 1.6 pulgadas o censurarlo después de 1.2 millones de ciclos, lo que ocurriera primero.
+
+```{r paquetes, include=FALSE}
+library(reshape2)
+library(ggplot2)
+library(readxl)
+library(dplyr)
+
+L1 <- read_excel("G:/Mi unidad/Semestre 4/Seminario de Titulacion/data/fatigue crack size example/TableC14.xlsx")
+colnames(L1)[9] <- "0.07"
+ww<- melt(L1, id= c("Unidad")) 
+names(ww)<-c("Unidad","x","y")
+ww$x <- as.numeric(as.character(ww$x))
+L1 <- L1[, -1]
+```
+
+```{r datos, echo=FALSE, message=FALSE, warning=FALSE}
+head(L1)
+```
+
+Visualizamos los datos
+
+```{r graph_datos, message=FALSE, warning=FALSE}
+# Plot the data
+ggplot(ww, aes(x = x, y = y, color = factor(Unidad))) +
+  geom_point() +
+  geom_line(aes(group = Unidad)) +
+  geom_hline(yintercept = 1.6, linetype = "dashed", color = "red") +
+  labs(x = "Millones de ciclos", y = "Tamaño de grieta en pulgadas", color = "Unidad") +
+  theme_minimal()
+```
+
+Aplicamos regresion a cada unidad y guardamos los resultados en un nuevo dataframe
+
+```{r regresion, echo=FALSE}
+# Create an empty data frame to store results
+results <- data.frame(Unidad = integer(), Intercept = numeric(), Slope = numeric(), Predicted_Time_Of_Failure = numeric())
+x<-seq(from=0.0, to=0.12,by=0.01)
+# Loop through each Unidad
+for (Unidad_num in 1:nrow(L1)) {
+  # Subset the data for the current Unidad
+  Unidad_data <- data.frame(x=x,y=t(L1[Unidad_num, ]))
+
+  # Fit the linear regression model
+  modelo <- lm(y ~ x, data = Unidad_data)
+  
+  # Get the coefficients
+  b <- coef(modelo)[1]
+  m <- coef(modelo)[2]
+  
+  # Predict the time of failure (when y = 10)
+  predicted_time_of_failure <- (1.6 - b) / m
+  
+  # Store the results in the data frame
+  results <- rbind(results, data.frame(Unidad = Unidad_num, Intercept = b, Slope = m, Predicted_Time_Of_Failure = predicted_time_of_failure))
+}
+head(results)
+```
+
+Gráfica de los datos con cada recta de regresión
+
+```{r rectas, message=FALSE, warning=FALSE}
+ggplot(ww, aes(x = x, y = y, color = factor(Unidad))) +
+  geom_point() +
+  geom_line(aes(group = Unidad)) +
+  geom_hline(yintercept = 1.6, linetype = "dashed", color = "red") +
+  labs(x = "Hundred Hours", y = "Porcentaje degradacion", color = "Unidad") +
+  geom_abline(intercept = results$Intercept, slope = results$Slope, color = "black", show.legend = FALSE) + xlim(0, 0.25)+
+  theme_minimal()
+```
+
+Ahora se muestra un histograma de las predicciones de los tiempos de vida
+
+```{r histograma, message=FALSE, warning=FALSE}
+# histograma
+ggplot(results, aes(x = Predicted_Time_Of_Failure)) +
+  geom_histogram(bins=5, fill = "blue", color = "black", alpha = 0.7) +
+  labs(x = "Predicted Time of Failure", y = "Frequency") +
+  ggtitle("Distribution of Predicted Time of Failure")
+```
+
+y la ECDF
+
+```{r ECDF}
+# cumulative empirical distribution function (ECDF)
+ggplot(results, aes(x = Predicted_Time_Of_Failure)) +
+  stat_ecdf(geom = "step", color = "blue") +
+  labs(x = "Predicted Time of Failure", y = "Cumulative Probability") +
+  ggtitle("Cumulative Empirical Distribution of Predicted Time of Failure")
+
+```
