@@ -1,5 +1,5 @@
 ---
-title: "crack size"
+title: "crack size example"
 author: "Edna Paola Gutierrez Vega"
 date: '2023-11-27'
 output: html_document
@@ -11,15 +11,22 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Introducción
 
-La siguiente tabla presenta el tamaño de las grietas por fatiga en relación con el número de ciclos de tensión aplicada para 21 probetas, proporcionando un ejemplo de datos de degradación. Estos datos fueron inicialmente reportados por Hudak, Saxena, Bucci y Malcolm (1978) con el propósito de recopilar información sobre las tasas de crecimiento de grietas en la aleación.
+La siguiente tabla presenta el tamaño de las grietas por fatiga en relación con el número de ciclos de tensión aplicada para 21 objetos de prueba, proporcionando un ejemplo de datos de degradación. Estos datos fueron inicialmente reportados por Hudak, Saxena, Bucci y Malcolm (1978) con el propósito de recopilar información sobre las tasas de crecimiento de grietas en la aleación.
 
-Cabe destacar que el tamaño inicial de cada grieta (es decir, en el momento 0) para cada trayectoria fue de 0.9 pulgadas. Supongamos que los investigadores desearan estimar el tiempo (medido en número de ciclos) en el cual las grietas alcanzarían las 1.6 pulgadas, considerado un tamaño peligroso. Con fines de nuestro análisis de degradación, se decidió terminar el experimento de fatiga para cada especimen en la primera inspección posterior a la cual las grietas alcanzaron las 1.6 pulgadas o censurarlo después de 1.2 millones de ciclos, lo que ocurriera primero.
+Cabe destacar que
+
+-   El tamaño inicial de cada grieta (es decir, en el momento 0) para cada trayectoria fue de 0.9 pulgadas.
+
+-   El experimento de fatiga para cada espécimen finalizó en la primera inspección posterior a la cual las grietas alcancen las 1.6 pulgadas o censurarlo después de 0.12 millones de ciclos, lo que ocurra primero.
+
+Se busca estimar el momento en el cual las grietas alcanzarían una longitud crítica de 1.6 pulgadas, considerada peligrosa.
 
 ```{r paquetes, include=FALSE}
 library(reshape2)
 library(ggplot2)
 library(readxl)
 library(dplyr)
+library(viridis)
 
 L1 <- read_excel("G:/Mi unidad/Semestre 4/Seminario de Titulacion/data/fatigue crack size example/TableC14.xlsx")
 colnames(L1)[9] <- "0.07"
@@ -33,7 +40,9 @@ L1 <- L1[, -1]
 head(L1)
 ```
 
-Visualizamos los datos
+## Visualización de los datos
+
+El siguiente bloque de código emplea la función ggplot en R para generar un gráfico visualmente informativo. Se crea un gráfico de dispersión con líneas conectando los puntos, y tanto los puntos como las líneas se colorean según la variable '*Unidad*', facilitando la identificación visual de diferentes unidades. Además, se incluye una línea horizontal punteada en y = 1.6 para resaltar un umbral crítico.
 
 ```{r graph_datos, message=FALSE, warning=FALSE}
 # Plot the data
@@ -45,9 +54,11 @@ ggplot(ww, aes(x = x, y = y, color = factor(Unidad))) +
   theme_minimal()
 ```
 
-Aplicamos regresion a cada unidad y guardamos los resultados en un nuevo dataframe
+## Regresión
 
-```{r regresion, echo=FALSE}
+El siguiente bloque de código comienza por crear un marco de datos vacío llamado 'results', diseñado para almacenar los resultados de un análisis de regresión lineal. A continuación, se inicializa un vector 'x' que abarca valores desde 0.0 hasta 0.12 en incrementos de 0.01. A través de un bucle que recorre cada unidad ('Unidad') en un conjunto de datos llamado 'L1', se lleva a cabo un ajuste de modelo de regresión lineal utilizando la función lm. Para cada unidad, se obtienen los coeficientes de la regresión, intercepto ('*Intercept*') y pendiente ('*Slope*'), y se realiza una predicción del tiempo de fallo cuando la variable de respuesta 'y' alcanza el valor de 1.6. Estos resultados se almacenan sistemáticamente en el dataframe '*results*' para su posterior análisis.
+
+```{r regresion, message=FALSE, warning=FALSE}
 # Create an empty data frame to store results
 results <- data.frame(Unidad = integer(), Intercept = numeric(), Slope = numeric(), Predicted_Time_Of_Failure = numeric())
 x<-seq(from=0.0, to=0.12,by=0.01)
@@ -63,7 +74,7 @@ for (Unidad_num in 1:nrow(L1)) {
   b <- coef(modelo)[1]
   m <- coef(modelo)[2]
   
-  # Predict the time of failure (when y = 10)
+  # Predict the time of failure (when y = 1.6)
   predicted_time_of_failure <- (1.6 - b) / m
   
   # Store the results in the data frame
@@ -72,35 +83,117 @@ for (Unidad_num in 1:nrow(L1)) {
 head(results)
 ```
 
-Gráfica de los datos con cada recta de regresión
+Adicionalmente, se agrega la línea de regresión para cada unidad, representada en color negro, utilizando los coeficientes de la regresión almacenados previamente en el dataframe '*results*'.
 
 ```{r rectas, message=FALSE, warning=FALSE}
 ggplot(ww, aes(x = x, y = y, color = factor(Unidad))) +
   geom_point() +
   geom_line(aes(group = Unidad)) +
   geom_hline(yintercept = 1.6, linetype = "dashed", color = "red") +
-  labs(x = "Hundred Hours", y = "Porcentaje degradacion", color = "Unidad") +
+  labs(x = "Millones de ciclos", y = "Tamaño de grieta en pulgadas", color = "Unidad") +
   geom_abline(intercept = results$Intercept, slope = results$Slope, color = "black", show.legend = FALSE) + xlim(0, 0.25)+
   theme_minimal()
 ```
 
-Ahora se muestra un histograma de las predicciones de los tiempos de vida
+## Distribución del tiempo de falla predicho
+
+Este bloque de código utiliza la función ggplot en R para crear un histograma que ilustra la distribución de los tiempos de falla predichos. La variable de interés, "Predicted_Time_Of_Failure", se representa en el eje x, mientras que la frecuencia de los diferentes intervalos se muestra en el eje y. Se ha optado por dividir los datos en 5 bins para proporcionar una representación visual clara de la distribución.
+
+La creación de un histograma de los tiempos de falla predichos es crucial para entender la variabilidad en las estimaciones temporales y para obtener información valiosa sobre la distribución de los posibles tiempos de fallo. Este tipo de visualización permite identificar patrones, tendencias y posiblemente identificar modos o agrupaciones de tiempos de falla, lo que puede ser fundamental en la evaluación de la confiabilidad y el rendimiento del material o sistema estudiado. Además, proporciona una herramienta esencial para tomar decisiones informadas en la gestión de riesgos y la planificación de mantenimiento preventivo.
 
 ```{r histograma, message=FALSE, warning=FALSE}
 # histograma
+library(viridis)  # Asegúrate de tener instalado el paquete
+
 ggplot(results, aes(x = Predicted_Time_Of_Failure)) +
-  geom_histogram(bins=5, fill = "blue", color = "black", alpha = 0.7) +
-  labs(x = "Predicted Time of Failure", y = "Frequency") +
-  ggtitle("Distribution of Predicted Time of Failure")
+  geom_histogram(bins = 5, fill = viridis_pal(option = "C")(5), color = "black", alpha = 0.7) +
+  labs(x = "Tiempo de falla predicho", y = "Frequencia") +
+  ggtitle("Distribución del tiempo de falla predicho") +
+  theme_minimal()
+
 ```
 
-y la ECDF
+Se genera tambien una gráfica de la Función de Distribución Acumulada Empírica (ECDF) para visualizar la distribución de los tiempos de falla predichos. La ECDF representa la probabilidad acumulada de que una observación sea menor o igual a un determinado valor. Esta visualización es esencial para comprender la variabilidad y la dispersión de los tiempos de falla estimados. Al observar cómo se acumulan las predicciones a lo largo del eje x, podemos obtener información clave sobre la probabilidad de que un sistema o material falle antes o después de ciertos intervalos de tiempo. Esta representación gráfica ofrece una perspectiva intuitiva y detallada de la distribución temporal de los fallos predichos, lo que resulta crucial para la evaluación de la fiabilidad y la toma de decisiones informadas en la gestión de activos y mantenimiento preventivo. La ECDF proporciona una herramienta valiosa para identificar patrones y tendencias en los datos, contribuyendo así a una comprensión más profunda de los comportamientos temporales esperados.
 
 ```{r ECDF}
 # cumulative empirical distribution function (ECDF)
 ggplot(results, aes(x = Predicted_Time_Of_Failure)) +
-  stat_ecdf(geom = "step", color = "blue") +
-  labs(x = "Predicted Time of Failure", y = "Cumulative Probability") +
-  ggtitle("Cumulative Empirical Distribution of Predicted Time of Failure")
+  stat_ecdf(geom = "step", color = viridis_pal(option = "C")(1)) +
+  labs(x = "Tiempo de falla predicho", y = "Probabilidad acumulada") +
+  ggtitle("Distribución empírica acumulada del tiempo de falla predicho")+
+  theme_minimal()
+
 
 ```
+
+## Interpretación de resultados
+
+Al observar el histograma y la ECDF se hacen los siguientes comentarios:
+
+1.  **Histograma con Mayor Frecuencia en el Primer Bin:**
+
+ - La mayor frecuencia en el primer bin sugiere que hay una concentración significativa de observaciones con tiempos de falla predichos más bajos.
+
+ - Esto podría indicar que la mayoría de las unidades o muestras tienen tiempos de falla iniciales o más tempranos.
+
+2.  **Caída del Histograma Conforme Aumenta el Tiempo:**
+
+ - La disminución de la frecuencia a medida que aumenta el tiempo en el histograma podría sugerir que los tiempos de falla más prolongados son menos comunes o menos probables.
+
+ - Podría indicar que hay una tendencia hacia tiempos de falla más cortos en la muestra o que la mayoría de los eventos de falla ocurren en un rango específico de tiempo.
+
+3.  **ECDF que Crece Rápidamente y Luego se Estabiliza:**
+
+ - El rápido crecimiento inicial de la ECDF indica que una proporción significativa de las unidades tiene tiempos de falla predichos más bajos.
+
+ - La estabilización posterior sugiere que, a medida que aumenta el tiempo, la probabilidad de observar tiempos de falla más largos tiende a estabilizarse, indicando una menor probabilidad acumulada de eventos de falla prolongados.
+
+En conjunto, estos patrones podrían sugerir que la mayoría de las unidades o muestras tienen tiempos de falla más tempranos, pero que hay una cola más larga de tiempos de falla menos comunes pero más prolongados. Esta información es util al momento de sugerir una familia de distrubucion para los tiempos de falla estimados.
+
+Inicialmente se consideran las familias de distribuciones log-normal, exponencial y beta. A continuacion se enlistan las caracteristicas clave de dichas distribuciones y cómo se relacionan con los patrones que se han observado:
+
+1.  **Distribución Log-Normal:**
+
+ - Características Relevantes:
+
+ - Asimetría derecha.
+
+ - Cola larga hacia la derecha.
+
+ - Relación con Observaciones:
+
+ - La concentración de observaciones en el primer bin y la caída conforme aumenta el tiempo sugiere la posibilidad de asimetría derecha, que es una característica de la distribución log-normal.
+
+ - La log-normal es conocida por modelar fenómenos con tiempos de espera que varían en una amplia gama y tienen una probabilidad significativa de eventos de larga duración.
+
+2.  **Distribución Exponencial:**
+
+ - Características Relevantes:
+
+ - Distribución de tiempo entre eventos sucesivos.
+
+ - Sin memoria: la probabilidad de que ocurra un evento en el futuro no está influenciada por eventos pasados.
+
+ - Relación con Observaciones:
+
+ - Podría ser adecuada si la caída en la probabilidad sugiere una tasa constante de eventos de falla a lo largo del tiempo.
+
+ - La rápida estabilización en la ECDF podría indicar la falta de memoria en el proceso de falla.
+
+3.  **Distribución Beta:**
+
+ - Características Relevantes:
+
+ - Versatilidad para adaptarse a diversas formas, incluida la asimetría.
+
+ - Puede tener soporte en un intervalo cerrado.
+
+ - Relación con Observaciones:
+
+ - Útil si la forma de la distribución no está clara y puede adaptarse a patrones más complejos.
+
+ - Si hay información adicional sobre la forma exacta de la distribución o si la variable de interés está limitada a un rango específico, la distribución beta podría ser apropiada.
+
+## Conclusiones
+
+En resumen, basándonos en la descripción de tus datos, la distribución log-normal parece ser una candidata razonable debido a su asimetría derecha y cola larga. Sin embargo, sería recomendable realizar pruebas de ajuste específicas para determinar cuál de estas distribuciones se ajusta mejor a los datos. También podrías considerar modelos mixtos o combinaciones de distribuciones si tus datos exhiben características de múltiples distribuciones.
